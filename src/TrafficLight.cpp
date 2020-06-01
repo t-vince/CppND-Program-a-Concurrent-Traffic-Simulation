@@ -2,11 +2,11 @@
 #include <random>
 #include <chrono>
 #include <thread>
+#include <future>
 #include "TrafficLight.h"
 
 /* Implementation of class "MessageQueue" */
 
-/* 
 template <typename T>
 T MessageQueue<T>::receive()
 {
@@ -20,8 +20,10 @@ void MessageQueue<T>::send(T &&msg)
 {
     // FP.4a : The method send should use the mechanisms std::lock_guard<std::mutex> 
     // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
+    std::lock_guard<std::mutex> uLock(_mutex);
+    _queue.push_back(std::move(msg));
+    _condition.notify_one(); // Notify client
 }
-*/
 
 
 /* Implementation of class "TrafficLight" */
@@ -49,6 +51,10 @@ void TrafficLight::simulate()
     threads.emplace_back(std::thread(&cycleThroughPhases, this));
 }
 
+int getRandomWaitTime(int min, int max) {
+    return ( rand()%(max-min + 1) + min );
+}
+
 // virtual function which is executed in a thread
 void TrafficLight::cycleThroughPhases()
 {
@@ -57,7 +63,7 @@ void TrafficLight::cycleThroughPhases()
     // to the message queue using move semantics. The cycle duration should be a random value between 4 and 6 seconds. 
     // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles.
 
-    int waitDuration = ( rand()%(6-4 + 1) + 4 );
+    int waitDuration = getRandomWaitTime(4, 6);
     auto lastSwitchedTime = std::chrono::system_clock::now();
 
     while(true) {
@@ -68,7 +74,13 @@ void TrafficLight::cycleThroughPhases()
 
         if (SecondsSinceSwitch >= waitDuration) {
             _currentPhase = (_currentPhase == red)? green : red;
+
+            auto ftr = std::async(std::launch::async, &MessageQueue<TrafficLightPhase>::send, &_queue, std::move(_currentPhase));
+            ftr.wait();
+
+            // Reset loop start time & duration
             lastSwitchedTime = currentLoopTime;
+            waitDuration = getRandomWaitTime(4, 6);
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
