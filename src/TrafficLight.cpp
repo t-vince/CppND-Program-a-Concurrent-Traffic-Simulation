@@ -1,5 +1,7 @@
 #include <iostream>
 #include <random>
+#include <chrono>
+#include <thread>
 #include "TrafficLight.h"
 
 /* Implementation of class "MessageQueue" */
@@ -42,7 +44,9 @@ TrafficLightPhase TrafficLight::getCurrentPhase()
 
 void TrafficLight::simulate()
 {
-    // FP.2b : Finally, the private method „cycleThroughPhases“ should be started in a thread when the public method „simulate“ is called. To do this, use the thread queue in the base class. 
+    // FP.2b : Finally, the private method „cycleThroughPhases“ should be started in a thread when the public method „simulate“ is called. 
+    // To do this, use the thread queue in the base class. 
+    threads.emplace_back(std::thread(&cycleThroughPhases, this));
 }
 
 // virtual function which is executed in a thread
@@ -51,5 +55,22 @@ void TrafficLight::cycleThroughPhases()
     // FP.2a : Implement the function with an infinite loop that measures the time between two loop cycles 
     // and toggles the current phase of the traffic light between red and green and sends an update method 
     // to the message queue using move semantics. The cycle duration should be a random value between 4 and 6 seconds. 
-    // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles. 
+    // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles.
+
+    int waitDuration = ( rand()%(6-4 + 1) + 4 );
+    auto lastSwitchedTime = std::chrono::system_clock::now();
+
+    while(true) {
+        auto currentLoopTime = std::chrono::system_clock::now();
+        int SecondsSinceSwitch = std::chrono::duration_cast<std::chrono::seconds>
+                                (currentLoopTime - lastSwitchedTime)
+                                .count();
+
+        if (SecondsSinceSwitch >= waitDuration) {
+            _currentPhase = (_currentPhase == red)? green : red;
+            lastSwitchedTime = currentLoopTime;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 }
