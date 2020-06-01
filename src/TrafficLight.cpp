@@ -82,9 +82,7 @@ void TrafficLight::cycleThroughPhases()
 
         if (SecondsSinceSwitch >= waitDuration) {
             _currentPhase = (_currentPhase == red)? green : red;
-
-            auto ftr = std::async(std::launch::async, &MessageQueue<TrafficLightPhase>::send, &_queue, std::move(_currentPhase));
-            ftr.wait();
+            _queue.send(std::move(_currentPhase));
 
             // Reset loop start time & duration
             lastSwitchedTime = currentLoopTime;
